@@ -42,8 +42,8 @@ const fzLocal = {
         convert: (model, msg, publish, options, meta) => {
             const dp = msg.data.dp;
             const value = tuya.getDataValue(msg.data.datatype, msg.data.data);
-            const systemModeLookup = {0: 'auto', 1: 'emergency_heating', 2: 'off', 3: 'heat'};
             const runningStateLookup = {0: 'idle', 1: 'heat'};
+            const systemModeLookup = {0: 'auto', 1: 'fan_only', 2: 'off', 3: 'heat'};
 
             switch (dp) {
             case tuyaLocal.dataPoints.rtitekSystemMode:
@@ -53,9 +53,11 @@ const fzLocal = {
             case tuyaLocal.dataPoints.rtitekLocalTemp:
                 return {local_temperature: parseFloat((value / 10).toFixed(1))};
             case tuyaLocal.dataPoints.rtitekBoostHeating:
-                return {boost_heating: value ? 'ON' : 'OFF'};
+                break; // seems not to work, also not available in SmartHome App
+//                return {boost_heating: value ? 'ON' : 'OFF'};
             case tuyaLocal.dataPoints.rtitekBoostHeatingCountdown:
-                return {boost_heating_countdown: value};
+                break; // seems not to work, also not available in SmartHome App
+//                return {boost_heating_countdown: value};
             case tuyaLocal.dataPoints.rtitekRunningState:
                 return {running_state: runningStateLookup[value]};
             case tuyaLocal.dataPoints.rtitekWindowState:
@@ -67,7 +69,7 @@ const fzLocal = {
             case tuyaLocal.dataPoints.rtitekBattery:
                 return {battery: value};
             case tuyaLocal.dataPoints.rtitekFaultAlarm:
-                break; // need to find out value
+                return {fault_alarm: value};
             case tuyaLocal.dataPoints.rtitekMinTemp:
                 return {min_temperature: parseFloat((value / 10).toFixed(1))};
             case tuyaLocal.dataPoints.rtitekMaxTemp:
@@ -146,7 +148,7 @@ const tzLocal = {
     rtitek_thermostat_system_mode: {
         key: ['system_mode'],
         convertSet: async (entity, key, value, meta) => {
-            const systemModeLookup = {0: 'auto', 1: 'emergency_heating', 2: 'off', 3: 'heat'};
+            const systemModeLookup = {'auto' : 0, 'fan_only' : 1, 'off' : 2, 'heat' : 3};
             await tuya.sendDataPointEnum(entity, tuyaLocal.dataPoints.rtitekSystemMode, systemModeLookup[value]);
         },
     },
@@ -157,32 +159,29 @@ const tzLocal = {
             await tuya.sendDataPointValue(entity, tuyaLocal.dataPoints.rtitekHeatingSetpoint, temp);
         },
     },
-    rtitek_thermostat_running_state: {
-        key: ['running_state'],
-        convertSet: async (entity, key, value, meta) => {
-            const runningStateLookup = {0: 'idle', 1: 'heat'};
-            await tuya.sendDataPointEnum(entity, tuyaLocal.dataPoints.rtitekRunningState, runningStateLookup[value]);
-        },
-    },
+
     rtitek_thermostat_window_detection: {
         key: ['window_detection'],
         convertSet: async (entity, key, value, meta) => {
             await tuya.sendDataPointBool(entity, tuyaLocal.dataPoints.rtitekWindowDetection, value === 'ON');
         },
     },
+
     rtitek_thermostat_child_lock: {
         key: ['child_lock'],
         convertSet: async (entity, key, value, meta) => {
             await tuya.sendDataPointBool(entity, tuyaLocal.dataPoints.rtitekChildLock, value === 'LOCK');
         },
     },
-    rtitek_thermostat_min_temperature: {
+
+	rtitek_thermostat_min_temperature: {
         key: ['min_temperature'],
         convertSet: async (entity, key, value, meta) => {
             const temp = Math.round(value * 10);
             await tuya.sendDataPointValue(entity, tuyaLocal.dataPoints.rtitekMinTemp, temp);
         },
     },
+
     rtitek_thermostat_max_temperature: {
         key: ['max_temperature'],
         convertSet: async (entity, key, value, meta) => {
@@ -190,6 +189,7 @@ const tzLocal = {
             await tuya.sendDataPointValue(entity, tuyaLocal.dataPoints.rtitekMaxTemp, temp);
         },
     },
+
     rtitek_thermostat_temperature_calibration: {
         key: ['local_temperature_calibration'],
         convertSet: async (entity, key, value, meta) => {
@@ -200,18 +200,20 @@ const tzLocal = {
             await tuya.sendDataPointValue(entity, tuyaLocal.rtitekTempCalibration, temp);
         },
     },
-    rtitek_thermostat_boost_heating: {
-        key: ['boost_heating'],
-        convertSet: async (entity, key, value, meta) => {
-            await tuya.sendDataPointBool(entity, tuyaLocal.dataPoints.rtitekBoostHeating, value === 'ON');
-        },
-    },
-    rtitek_thermostat_boost_heating_countdown: {
-        key: ['boost_heating_countdown'],
-        convertSet: async (entity, key, value, meta) => {
-            await tuya.sendDataPointValue(entity, tuyaLocal.dataPoints.rtitekBoostHeatingCountdown, value);
-        },
-    },
+
+//    rtitek_thermostat_boost_heating: {
+//        key: ['boost_heating'],
+//        convertSet: async (entity, key, value, meta) => {
+//            await tuya.sendDataPointBool(entity, tuyaLocal.dataPoints.rtitekBoostHeating, value === 'ON');
+//        },
+//    },
+
+//    rtitek_thermostat_boost_heating_countdown: {
+//       key: ['boost_heating_countdown'],
+//        convertSet: async (entity, key, value, meta) => {
+//            await tuya.sendDataPointValue(entity, tuyaLocal.dataPoints.rtitekBoostHeatingCountdown, value);
+//        },
+//    },
 };
 
 const definition = {
@@ -235,7 +237,7 @@ const definition = {
     exposes: [
         exposes.climate().withLocalTemperature(ea.STATE)
 			.withSetpoint('current_heating_setpoint', 5, 35, 0.5, ea.STATE_SET)
-			.withSystemMode(['auto', 'emergency_heating', 'off', 'heat'], ea.STATE_SET) // using "emergency_heating" for "manual" and "heat" for "on"
+			.withSystemMode(['auto', 'fan_only', 'off', 'heat'], ea.STATE_SET)
 			.withRunningState(['idle', 'heat'], ea.STATE_SET)
             .withLocalTemperatureCalibration(ea.STATE_SET),
         e.max_temperature(),
@@ -252,10 +254,11 @@ const definition = {
 		e.window_detection(),
 		exposes.binary('window', ea.STATE, 'OPEN', 'CLOSED').withDescription('Window status closed or open '),
         e.child_lock(),
+		exposes.text('fault_alarm', ea.STATE),// not sure what type, never seen one
 		e.battery(),
 		e.position(),
-        exposes.binary('boost_heating', ea.STATE_SET, 'ON', 'OFF').withDescription('Boost heating'),
-        exposes.numeric('boost_heating_countdown', ea.STATE_SET).withUnit('min').withDescription('Boost heating countdown in minutes'),
+//        exposes.binary('boost_heating', ea.STATE_SET, 'ON', 'OFF').withDescription('Boost heating'),
+//        exposes.numeric('boost_heating_countdown', ea.STATE_SET).withUnit('min').withDescription('Boost heating countdown in minutes'),
 		exposes.numeric('software_version', ea.STATE),
     ],
 };
