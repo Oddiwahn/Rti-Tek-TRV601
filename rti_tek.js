@@ -1,3 +1,9 @@
+// external converter file for Rti-Tek TRV601 thermostatic radiator valve.
+// just copy to /config/zigbee2mqtt and add it to your configuration.yaml like this:
+// external_converters:
+//  - rti_tek.js
+
+
 const fz = require('zigbee-herdsman-converters/converters/fromZigbee');
 // const tz = require('zigbee-herdsman-converters/converters/toZigbee');
 const exposes = require('zigbee-herdsman-converters/lib/exposes');
